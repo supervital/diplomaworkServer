@@ -1,5 +1,7 @@
 package com.serverside.smartpic.main;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.Map;
 
 import jssc.SerialPort;
@@ -27,7 +29,7 @@ public class PICResponse extends NanoServer {
 
 	/* Command headers */
 	public static final String DEVICE_COMMAND = "device_command"; // Key
-	public static final String READ_FORM_COM_PORT = "read_from"; // Value
+	public static final String READ_FROM_COM_PORT = "read_from"; // Value
 	public static final String WRITE_TO_COM_PORT = "write_to"; // Value
 
 	/* State headers */
@@ -47,32 +49,44 @@ public class PICResponse extends NanoServer {
 			Map<String, String> header, Map<String, String> parms,
 			Map<String, String> files) {
 
+		// Security check
 		if (header.get(CLIENT_ID) == null
 				|| !header.get(CLIENT_ID).equals(CLIENT_SECRET)) {
 			// Redirect on 403 page
 			return new Response(Status.FORBIDDEN, NanoServer.MIME_HTML, "");
 		}
-		if (parms.get(DEVICE_COMMAND) != null
-				&& parms.get(DEVICE_STATE) != null) {
-			// TODO: send WRITE/READ signals to COM - Port
-			if (parms.get(DEVICE_COMMAND).equals(WRITE_TO_COM_PORT)) {
-				// write to COM - Port
+
+		if (header.get(DEVICE_COMMAND).equals(WRITE_TO_COM_PORT)) {
+			// TODO: send WRITE signal to COM - Port
+			if (parms.get(DEVICE_STATE) != null) {
 				System.out.println(parms.get(DEVICE_STATE));
-				synchronized (parms.get(DEVICE_STATE)) {
+				synchronized (WRITE_TO_COM_PORT) {
 					int value = Integer.parseInt(parms.get(DEVICE_STATE));
 					if (writeToPort(getPortName(), value) == 404)
 						return new Response(Status.BAD_REQUEST,
 								NanoServer.MIME_HTML, "");
 				}
-			} else if (parms.get(DEVICE_COMMAND).equals(READ_FORM_COM_PORT)) {
-				// read from COM - Port
+			} else {
+				return new Response(Status.BAD_REQUEST, NanoServer.MIME_HTML,
+						"");
 			}
-		} else {
-			// Redirect on 404 page
-			return new Response(Status.BAD_REQUEST, NanoServer.MIME_HTML, "");
+		} else if (header.get(DEVICE_COMMAND).equals(READ_FROM_COM_PORT)) {
+			// TODO: send READ signals from COM - Port
+			synchronized (READ_FROM_COM_PORT) {
+				int value = readFromPort(getPortName());
+				if (value == 404) {
+					return new Response(Status.BAD_REQUEST,
+							NanoServer.MIME_HTML, "");
+
+				}
+				InputStream inputStream = new ByteArrayInputStream(Integer
+						.toString(value).getBytes());
+				return new Response(Status.OK, NanoServer.MIME_HTML,
+						inputStream);
+			}
 		}
 
-		return new Response("!");
+		return new Response(Status.OK, NanoServer.MIME_HTML, "");
 	}
 
 	private String getPortName() {
@@ -100,9 +114,8 @@ public class PICResponse extends NanoServer {
 		}
 	}
 
-	private int readFromPort() {
-		SerialPort ssport = new SerialPort("");
-		int portState = 0;
+	private int readFromPort(String portName) {
+		SerialPort ssport = new SerialPort(portName);
 		try {
 			ssport.openPort();
 			ssport.setParams(SerialPort.BAUDRATE_19200, SerialPort.DATABITS_8,
