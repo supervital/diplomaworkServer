@@ -1,6 +1,7 @@
 package com.serverside.smartpic.main;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
@@ -35,13 +36,15 @@ public class PICResponse extends NanoServer {
 	/* State headers */
 	public static final String DEVICE_STATE = "device_state"; // Key
 
+	/* Error code for COM - PORT */
+	public static final int SERIAL_PORT_ERROR = 404;
+
 	public PICResponse() {
 		super(PORT);
 	}
 
 	public static void main(String[] args) {
 		ServerRunner.run(PICResponse.class);
-
 	}
 
 	@Override
@@ -59,10 +62,9 @@ public class PICResponse extends NanoServer {
 		if (header.get(DEVICE_COMMAND).equals(WRITE_TO_COM_PORT)) {
 			// TODO: send WRITE signal to COM - Port
 			if (parms.get(DEVICE_STATE) != null) {
-				System.out.println(parms.get(DEVICE_STATE));
 				synchronized (WRITE_TO_COM_PORT) {
 					int value = Integer.parseInt(parms.get(DEVICE_STATE));
-					if (writeToPort(getPortName(), value) == 404)
+					if (writeToPort(getPortName(), value) == SERIAL_PORT_ERROR)
 						return new Response(Status.BAD_REQUEST,
 								NanoServer.MIME_HTML, "");
 				}
@@ -71,13 +73,12 @@ public class PICResponse extends NanoServer {
 						"");
 			}
 		} else if (header.get(DEVICE_COMMAND).equals(READ_FROM_COM_PORT)) {
-			// TODO: send READ signals from COM - Port
+			// TODO: send READ signal from COM - Port
 			synchronized (READ_FROM_COM_PORT) {
 				int value = readFromPort(getPortName());
-				if (value == 404) {
+				if (value == SERIAL_PORT_ERROR) {
 					return new Response(Status.BAD_REQUEST,
 							NanoServer.MIME_HTML, "");
-
 				}
 				InputStream inputStream = new ByteArrayInputStream(Integer
 						.toString(value).getBytes());
@@ -110,7 +111,7 @@ public class PICResponse extends NanoServer {
 			return number;
 		} catch (SerialPortException e) {
 			e.printStackTrace();
-			return 404;
+			return SERIAL_PORT_ERROR;
 		}
 	}
 
@@ -128,7 +129,7 @@ public class PICResponse extends NanoServer {
 			return intArray[0];
 		} catch (SerialPortException e) {
 			e.printStackTrace();
-			return 404;
+			return SERIAL_PORT_ERROR;
 		}
 
 	}
